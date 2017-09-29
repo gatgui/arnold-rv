@@ -419,15 +419,18 @@ static const char* ColorCorrectionNames[] =
 
 node_parameters
 {
-   AiParameterSTR("host", "localhost");
-   AiParameterINT("port", 45124);
-   AiParameterSTR("extra_args", "");
-   AiParameterENUM("color_correction", 0, ColorCorrectionNames);
-   AiParameterFLT("gamma", 0.0f);
-   AiParameterSTR("lut", "");
-   AiParameterSTR("ocio_profile", "");
-   AiParameterSTR("media_name", "");
-   AiParameterBOOL("add_timestamp", false);
+   #if AI_VERSION_ARCH_NUM >= 5
+   AtNodeEntry* mds = nentry;
+   #endif
+   AiParameterStr("host", "localhost");
+   AiParameterInt("port", 45124);
+   AiParameterStr("extra_args", "");
+   AiParameterEnum("color_correction", 0, ColorCorrectionNames);
+   AiParameterFlt("gamma", 0.0f);
+   AiParameterStr("lut", "");
+   AiParameterStr("ocio_profile", "");
+   AiParameterStr("media_name", "");
+   AiParameterBool("add_timestamp", false);
    
    AiMetaDataSetBool(mds, "gamma", "maya.hide", true);
    //AiMetaDataSetBool(mds, "media_name", "maya.hide", true);
@@ -452,7 +455,12 @@ node_initialize
    data->media_name = NULL;
    data->frame = 0;
    data->fps = 24.0;
+   #if AI_VERSION_ARCH_NUM < 5
    AiDriverInitialize(node, true, data);
+   #else
+   AiDriverInitialize(node, true);
+   AiNodeSetLocalData(node, data);
+   #endif
 }
 
 node_update
@@ -473,7 +481,11 @@ driver_open
 {
    AiMsgDebug("[rvdriver] Driver open");
    
+   #if AI_VERSION_ARCH_NUM < 5
    ShaderData *data = (ShaderData*) AiDriverGetLocalData(node);
+   #else
+   ShaderData *data = (ShaderData*) AiNodeGetLocalData(node);
+   #endif
    
    const char* host = AiNodeGetStr(node, "host");
    // TODO: allow port to be a search range of form "45124-45128" ?
@@ -603,7 +615,11 @@ driver_open
    // Create client if needed
    if (data->client == NULL)
    {
+      #if AI_VERSION_ARCH_NUM < 5
       data->client = new Client(AiNodeGetStr(node, "extra_args"));
+      #else
+      data->client = new Client(AiNodeGetStr(node, "extra_args").c_str());
+      #endif
    }
    else
    {
@@ -627,7 +643,11 @@ driver_open
    if (data->media_name == NULL)
    {
       // always add time stamp?
+      #if AI_VERSION_ARCH_NUM < 5
       std::string mn = AiNodeGetStr(node, "media_name");
+      #else
+      std::string mn = AiNodeGetStr(node, "media_name").c_str();
+      #endif
       if (mn.length() == 0)
       {
          mn = gcore::Date().format("%Y-%m-%d_%H:%M:%S");
@@ -955,7 +975,11 @@ driver_process_bucket
 
 driver_write_bucket
 {
+   #if AI_VERSION_ARCH_NUM < 5
    ShaderData *data = (ShaderData*) AiDriverGetLocalData(node);
+   #else
+   ShaderData *data = (ShaderData*) AiNodeGetLocalData(node);
+   #endif
    
    if (data->media_name == NULL)
    {
@@ -1030,7 +1054,9 @@ driver_write_bucket
          }
          case AI_TYPE_RGB:
          case AI_TYPE_VECTOR:
+         #if AI_VERSION_ARCH_NUM < 5
          case AI_TYPE_POINT:
+         #endif
          {
             for (int j = 0; j < bucket_size_y; ++j)
             {
@@ -1093,8 +1119,11 @@ driver_close
 node_finish
 {
    AiMsgDebug("[rvdriver] Driver finish");
-
+   #if AI_VERSION_ARCH_NUM < 5
    ShaderData *data = (ShaderData*) AiDriverGetLocalData(node);
+   #else
+   ShaderData *data = (ShaderData*) AiNodeGetLocalData(node);
+   #endif
    
    if (data->media_name != NULL)
    {
@@ -1114,7 +1143,10 @@ node_finish
    delete data->client;
    
    AiFree(data);
+
+   #if AI_VERSION_ARCH_NUM < 5
    AiDriverDestroy(node);
+   #endif
 }
 
 node_loader
